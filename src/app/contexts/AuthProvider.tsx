@@ -1,11 +1,11 @@
 // contexts/AuthProvider.tsx
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { User, Session } from '@supabase/supabase-js';
-import { UserProfile } from '../../types/database';
-import { createMissingUserProfile } from '../../utils/fixMissingProfiles';
+import { UserProfile } from '@/types/database';
+import { createMissingUserProfile } from '@/utils/fixMissingProfiles';
 
 interface AuthContextType {
   user: User | null;
@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   
   const supabase = createClientComponentClient();
 
-  const fetchUserProfile = async (userId: string, email: string) => {
+  const fetchUserProfile = useCallback(async (userId: string, email: string) => {
     try {
       console.log('Fetching profile for user:', userId);
       
@@ -70,7 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Failed to fetch/create user profile:', error);
       setProfile(null);
     }
-  };
+  }, [supabase]);
 
   const refreshProfile = async () => {
     if (user?.id && user?.email) {
@@ -90,6 +90,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    let mounted = true;
+
     // Get initial session
     const getInitialSession = async () => {
       try {
@@ -97,21 +99,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (error) {
           console.error('Error getting session:', error);
-          setLoading(false);
+          if (mounted) setLoading(false);
           return;
         }
 
         console.log('Initial session:', session);
-        setSession(session);
-        setUser(session?.user ?? null);
+        if (mounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+        }
 
-        if (session?.user?.id && session?.user?.email) {
+        if (session?.user?.id && session?.user?.email && mounted) {
           await fetchUserProfile(session.user.id, session.user.email);
         }
       } catch (error) {
         console.error('Error in getInitialSession:', error);
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     };
 
@@ -122,22 +126,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event, session) => {
         console.log('Auth state changed:', event, session);
         
-        setSession(session);
-        setUser(session?.user ?? null);
+        if (mounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+        }
 
-        if (session?.user?.id && session?.user?.email) {
+        if (session?.user?.id && session?.user?.email && mounted) {
           await fetchUserProfile(session.user.id, session.user.email);
-        } else {
+        } else if (mounted) {
           setProfile(null);
         }
 
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     );
 
     return () => {
+      mounted = false;
       subscription?.unsubscribe();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase]);
 
   return (
