@@ -1,18 +1,17 @@
-'use client'
+'use client';
 
-import { useState, Fragment, useEffect } from 'react'
-import { Dialog, Transition } from '@headlessui/react'
-import { XMarkIcon } from '@heroicons/react/24/outline'
-import { supabase } from '@/lib/supabase/client'
-import type { Database } from '@/lib/supabase/database.types'
+import { useState, Fragment, useEffect, useCallback } from 'react';
+import { Dialog, Transition } from '@headlessui/react';
+import { supabase } from '@/lib/supabase/client';
+import type { Database } from '@/lib/supabase/database.types';
 
-type IncomeSource = Database['public']['Tables']['income_sources']['Row']
+type IncomeSource = Database['public']['Tables']['income_sources']['Row'];
 
 interface AddIncomeEntryModalProps {
-  isOpen: boolean
-  onClose: () => void
-  onEntryAdded: () => void
-  sourceId: string
+  isOpen: boolean;
+  onClose: () => void;
+  onEntryAdded: () => void;
+  sourceId: string;
 }
 
 function XMarkIcon_({ className }: { className?: string }) {
@@ -20,93 +19,101 @@ function XMarkIcon_({ className }: { className?: string }) {
     <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
     </svg>
-  )
+  );
 }
 
 export default function AddIncomeEntryModal({
   isOpen,
   onClose,
   onEntryAdded,
-  sourceId
+  sourceId,
 }: AddIncomeEntryModalProps) {
-  const [incomeSource, setIncomeSource] = useState<IncomeSource | null>(null)
+  const [incomeSource, setIncomeSource] = useState<IncomeSource | null>(null);
   const [formData, setFormData] = useState({
     amount: '',
-    date: new Date().toISOString().split('T')[0], // Today's date
-    description: ''
-  })
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+    date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
+    description: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (sourceId && isOpen) {
-      fetchIncomeSource()
-    }
-  }, [sourceId, isOpen])
-
-  const fetchIncomeSource = async () => {
+  /** Fetch the source (memoized so useEffect deps are correct) */
+  const fetchIncomeSource = useCallback(async () => {
+    if (!sourceId) return;
     try {
       const { data, error } = await supabase
         .from('income_sources')
         .select('*')
         .eq('id', sourceId)
-        .single()
+        .single<IncomeSource>();
 
-      if (error) throw error
-      setIncomeSource(data)
-      
-      // Pre-fill amount if source has expected amount
-      if (data.amount) {
-        setFormData(prev => ({
+      if (error) throw error;
+      setIncomeSource(data);
+
+      // Pre-fill amount if the source has a default/expected amount
+      if (data?.amount != null) {
+        setFormData((prev) => ({
           ...prev,
-          amount: data.amount?.toString() || ''
-        }))
+          amount: String(data.amount),
+        }));
       }
     } catch (err) {
-      console.error('Error fetching income source:', err)
+      console.error('Error fetching income source:', err);
     }
-  }
+  }, [sourceId]);
+
+  /** Load when opened or when sourceId changes */
+  useEffect(() => {
+    if (isOpen) {
+      fetchIncomeSource();
+    }
+  }, [isOpen, fetchIncomeSource]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
+    e.preventDefault();
+    setLoading(true);
+    setError('');
 
     try {
-      const { error: insertError } = await supabase
-        .from('income_entries')
-        .insert({
-          income_source_id: sourceId,
-          amount: parseFloat(formData.amount),
-          date: formData.date,
-          description: formData.description || null
-        })
+      const parsedAmount = Number.parseFloat(formData.amount);
+      if (Number.isNaN(parsedAmount)) {
+        setError('Please enter a valid amount.');
+        setLoading(false);
+        return;
+      }
 
-      if (insertError) throw insertError
+      const { error: insertError } = await supabase.from('income_entries').insert({
+        income_source_id: sourceId,
+        amount: parsedAmount,
+        date: formData.date,
+        description: formData.description || null,
+      });
 
-      onEntryAdded()
-      
-      // Reset form
+      if (insertError) throw insertError;
+
+      onEntryAdded();
+
+      // Reset form (keep default source amount if present)
       setFormData({
-        amount: incomeSource?.amount?.toString() || '',
+        amount: incomeSource?.amount != null ? String(incomeSource.amount) : '',
         date: new Date().toISOString().split('T')[0],
-        description: ''
-      })
+        description: '',
+      });
     } catch (err) {
-      console.error('Error adding income entry:', err)
-      setError('Failed to add income entry. Please try again.')
+      console.error('Error adding income entry:', err);
+      setError('Failed to add income entry. Please try again.');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
+    const { name, value } = e.target;
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
-    }))
-  }
+      [name]: value,
+    }));
+  };
 
   return (
     <Transition.Root show={isOpen} as={Fragment}>
@@ -151,7 +158,7 @@ export default function AddIncomeEntryModal({
                     <Dialog.Title as="h3" className="text-lg font-semibold leading-6 text-gray-900">
                       Add Income Entry
                     </Dialog.Title>
-                    
+
                     {incomeSource && (
                       <div className="mt-2 p-3 bg-gray-50 rounded-md">
                         <p className="text-sm text-gray-700">
@@ -162,7 +169,7 @@ export default function AddIncomeEntryModal({
                         </p>
                       </div>
                     )}
-                    
+
                     <form onSubmit={handleSubmit} className="mt-6 space-y-4">
                       {error && (
                         <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
@@ -252,5 +259,5 @@ export default function AddIncomeEntryModal({
         </div>
       </Dialog>
     </Transition.Root>
-  )
+  );
 }
