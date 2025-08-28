@@ -1,7 +1,6 @@
 'use client'
 
 import { Fragment } from 'react'
-import { Bars3Icon, BellIcon } from '@heroicons/react/24/outline'
 import { Menu, Transition } from '@headlessui/react'
 import { useAuth } from '@/components/providers/AuthProvider'
 
