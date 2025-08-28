@@ -12,6 +12,49 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const router = useRouter()
 
+  const createMissingProfile = async () => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      alert('No user found')
+      return
+    }
+
+    // Create household
+    const { data: household, error: householdError } = await supabase
+      .from('households')
+      .insert({
+        name: `${user.email?.split('@')[0] || 'User'}'s Household`
+      })
+      .select()
+      .single()
+
+    if (householdError) {
+      console.error('Household error:', householdError)
+      return
+    }
+
+    // Create profile
+    const { error: profileError } = await supabase
+      .from('user_profiles')
+      .insert({
+        id: user.id,
+        household_id: household.id,
+        full_name: user.email?.split('@')[0] || 'User',
+        role: 'admin'
+      })
+
+    if (profileError) {
+      console.error('Profile error:', profileError)
+      return
+    }
+
+    alert('Profile created! Try refreshing.')
+  } catch (err) {
+    console.error('Error:', err)
+  }
+}
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -139,7 +182,7 @@ export default function LoginPage() {
               </button>
             </div>
           </form>
-
+                    
           {/* Divider */}
           <div className="mt-6">
             <div className="relative">
@@ -149,6 +192,15 @@ export default function LoginPage() {
               <div className="relative flex justify-center text-sm">
                 <span className="px-2 bg-white text-gray-500">Or continue with</span>
               </div>
+            </div>
+            
+            <div className="mt-4 text-center">
+              <button 
+                onClick={createMissingProfile} 
+                className="bg-red-600 text-white px-4 py-2 rounded"
+              >
+                Create Missing Profile (Debug)
+              </button>
             </div>
 
             {/* Social Login - placeholder for future */}
@@ -165,6 +217,7 @@ export default function LoginPage() {
             </div>
           </div>
         </div>
+        
       </div>
     </div>
   )
