@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 
-export default function AuthCallback() {
+function CallbackContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [status, setStatus] = useState('Processing...')
@@ -46,7 +46,7 @@ export default function AuthCallback() {
           const { data: household, error: householdError } = await supabase
             .from('households')
             .insert({
-              name: `${user.email?.split('@')[0]}'s Household` // Default name
+              name: `${user.email?.split('@')[0]}'s Household`
             })
             .select()
             .single()
@@ -63,7 +63,7 @@ export default function AuthCallback() {
             .insert({
               id: user.id,
               household_id: household.id,
-              full_name: user.email?.split('@')[0] || 'User', // Default name
+              full_name: user.email?.split('@')[0] || 'User',
               role: 'admin'
             })
 
@@ -94,5 +94,17 @@ export default function AuthCallback() {
         <p className="text-gray-600">{status}</p>
       </div>
     </div>
+  )
+}
+
+export default function AuthCallback() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    }>
+      <CallbackContent />
+    </Suspense>
   )
 }
