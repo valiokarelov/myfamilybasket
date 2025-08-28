@@ -35,6 +35,7 @@ export interface Database {
           id: string
           household_id: string | null
           full_name: string
+          email: string | null
           role: string
           avatar_url: string | null
           created_at: string
