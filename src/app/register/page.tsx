@@ -25,41 +25,43 @@ export default function RegisterPage() {
   }
 
   const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
+  e.preventDefault()
+  setLoading(true)
+  setError('')
 
-    // Basic validation
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match')
-      setLoading(false)
+  // Basic validation
+  if (formData.password !== formData.confirmPassword) {
+    setError('Passwords do not match')
+    setLoading(false)
+    return
+  }
+
+  if (formData.password.length < 6) {
+    setError('Password must be at least 6 characters long')
+    setLoading(false)
+    return
+  }
+
+  try {
+    // 1. Create user account
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: formData.email,
+      password: formData.password,
+    })
+
+    if (authError) {
+      setError(authError.message)
       return
     }
 
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long')
-      setLoading(false)
+    if (!authData.user) {
+      setError('Failed to create user account')
       return
     }
 
-    try {
-      // 1. Create user account
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-      })
-
-      if (authError) {
-        setError(authError.message)
-        return
-      }
-
-      if (!authData.user) {
-        setError('Failed to create user account')
-        return
-      }
-
-      // 2. Create household
+    // Check if user is immediately confirmed (email confirmation disabled)
+    if (authData.session) {
+      // User is logged in - create household and profile
       const { data: householdData, error: householdError } = await supabase
         .from('households')
         .insert({
@@ -73,14 +75,13 @@ export default function RegisterPage() {
         return
       }
 
-      // 3. Create user profile
       const { error: profileError } = await supabase
         .from('user_profiles')
         .insert({
           id: authData.user.id,
           household_id: householdData.id,
           full_name: formData.fullName,
-          role: 'admin', // First user is admin
+          role: 'admin',
         })
 
       if (profileError) {
@@ -90,13 +91,18 @@ export default function RegisterPage() {
 
       // Success! Redirect to dashboard
       router.push('/dashboard')
-    } catch (err) {
-      console.error('Registration error:', err)
-      setError('An unexpected error occurred')
-    } finally {
-      setLoading(false)
+    } else {
+      // Email confirmation required
+      setError('Please check your email for a confirmation link')
     }
+
+  } catch (err) {
+    console.error('Registration error:', err)
+    setError('An unexpected error occurred')
+  } finally {
+    setLoading(false)
   }
+}
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
