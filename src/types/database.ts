@@ -1,12 +1,13 @@
 // types/database.ts
 export interface UserProfile {
   id: string;
-  email: string; // Add this field
-  first_name: string | null;
-  last_name: string | null;
+  email: string;
+  household_id: string | null;
+  full_name: string | null; 
+  role: string | null; 
+  avatar_url: string | null;
   created_at: string;
   updated_at: string;
-  household_id: string | null;
 }
 
 export interface Household {

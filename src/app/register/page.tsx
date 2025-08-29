@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase/client'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -14,8 +14,11 @@ export default function RegisterPage() {
     householdName: '',
   })
   const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
+  
+  const supabase = createClientComponentClient()
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -25,84 +28,109 @@ export default function RegisterPage() {
   }
 
   const handleRegister = async (e: React.FormEvent) => {
-  e.preventDefault()
-  setLoading(true)
-  setError('')
+    e.preventDefault()
+    setLoading(true)
+    setError('')
 
-  // Basic validation
-  if (formData.password !== formData.confirmPassword) {
-    setError('Passwords do not match')
-    setLoading(false)
-    return
-  }
-
-  if (formData.password.length < 6) {
-    setError('Password must be at least 6 characters long')
-    setLoading(false)
-    return
-  }
-
-  try {
-    // 1. Create user account
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: formData.email,
-      password: formData.password,
-    })
-
-    if (authError) {
-      setError(authError.message)
+    // Basic validation
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match')
+      setLoading(false)
       return
     }
 
-    if (!authData.user) {
-      setError('Failed to create user account')
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long')
+      setLoading(false)
       return
     }
 
-    // Check if user is immediately confirmed (email confirmation disabled)
-    if (authData.session) {
-      // User is logged in - create household and profile
-      const { data: householdData, error: householdError } = await supabase
-        .from('households')
-        .insert({
-          name: formData.householdName,
-        })
-        .select()
-        .single()
+    try {
+      console.log('Starting registration for:', formData.email)
 
-      if (householdError) {
-        setError('Failed to create household')
+      // 1. Create user account
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+      })
+
+      if (authError) {
+        console.error('Auth error:', authError)
+        setError(authError.message)
         return
       }
 
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .insert({
-          id: authData.user.id,
-          household_id: householdData.id,
-          full_name: formData.fullName,
-          role: 'admin',
-        })
-
-      if (profileError) {
-        setError('Failed to create user profile')
+      if (!authData.user) {
+        setError('Failed to create user account')
         return
       }
 
-      // Success! Redirect to dashboard
-      router.push('/dashboard')
-    } else {
-      // Email confirmation required
-      setError('Please check your email for a confirmation link')
+      console.log('User created:', authData.user.id)
+
+      // Check if user is immediately confirmed (email confirmation disabled)
+      if (authData.session) {
+        console.log('User session active, creating household and profile...')
+        
+        // 2. Create household with required created_by field
+        const { data: householdData, error: householdError } = await supabase
+          .from('households')
+          .insert({
+            name: formData.householdName,
+            created_by: authData.user.id,
+          })
+          .select()
+          .single()
+
+        if (householdError) {
+          console.error('Household error:', householdError)
+          setError(`Failed to create household: ${householdError.message}`)
+          return
+        }
+
+        console.log('Household created:', householdData)
+
+        // 3. Create user profile with correct fields matching your actual schema
+        const { error: profileError } = await supabase
+          .from('user_profiles')
+          .insert({
+            id: authData.user.id,
+            email: authData.user.email,
+            household_id: householdData.id,
+            full_name: formData.fullName,
+            role: 'admin',
+            avatar_url: null,
+          })
+
+        if (profileError) {
+          console.error('Profile error:', profileError)
+          setError(`Failed to create user profile: ${profileError.message}`)
+          return
+        }
+
+        console.log('Profile created successfully')
+
+        // SUCCESS! Now show success message and redirect
+        setSuccess(true)
+        setError('') // Clear any errors
+        
+        // Redirect after giving AuthProvider time to load the profile
+        setTimeout(() => {
+          console.log('Redirecting to dashboard...')
+          router.push('/welcome')
+        }, 1500)
+
+      } else {
+        // Email confirmation required
+        setError('Please check your email for a confirmation link')
+      }
+
+    } catch (err) {
+      console.error('Registration error:', err)
+      setError('An unexpected error occurred')
+    } finally {
+      setLoading(false)
     }
-
-  } catch (err) {
-    console.error('Registration error:', err)
-    setError('An unexpected error occurred')
-  } finally {
-    setLoading(false)
   }
-}
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -130,9 +158,18 @@ export default function RegisterPage() {
         {/* Register Form */}
         <div className="bg-white rounded-xl shadow-sm p-8">
           <form className="space-y-6" onSubmit={handleRegister}>
-            {error && (
+            {error && !success && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
                 {error}
+              </div>
+            )}
+
+            {success && (
+              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600 mr-2"></div>
+                  Account created successfully! Redirecting to dashboard...
+                </div>
               </div>
             )}
 
@@ -245,10 +282,15 @@ export default function RegisterPage() {
             <div>
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || success}
                 className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? (
+                {success ? (
+                  <div className="flex items-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Account Created! Redirecting...
+                  </div>
+                ) : loading ? (
                   <div className="flex items-center">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                     Creating account...
@@ -264,8 +306,8 @@ export default function RegisterPage() {
         {/* Additional Info */}
         <div className="text-center">
           <p className="text-xs text-gray-500">
-            By creating an account, you&apos;ll be able to manage your household budget,
-            invite family members, and start tracking your expenses right away.
+            {`By creating an account, you'll be able to manage your household budget,
+            invite family members, and start tracking your expenses right away.`}
           </p>
         </div>
       </div>
