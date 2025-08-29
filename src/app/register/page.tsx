@@ -116,7 +116,7 @@ export default function RegisterPage() {
         // Redirect after giving AuthProvider time to load the profile
         setTimeout(() => {
           console.log('Redirecting to dashboard...')
-          router.push('/welcome')
+          router.push('/dashboard')
         }, 1500)
 
       } else {
@@ -306,8 +306,8 @@ export default function RegisterPage() {
         {/* Additional Info */}
         <div className="text-center">
           <p className="text-xs text-gray-500">
-            {`By creating an account, you'll be able to manage your household budget,
-            invite family members, and start tracking your expenses right away.`}
+            By creating an account, you&apos;ll be able to manage your household budget,
+            invite family members, and start tracking your expenses right away.
           </p>
         </div>
       </div>
