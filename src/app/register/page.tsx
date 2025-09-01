@@ -1,8 +1,8 @@
+//app/register/page.tsx - Simple success version
 'use client'
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 export default function RegisterPage() {
@@ -16,8 +16,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
-  const router = useRouter()
-  
+    
   const supabase = createClientComponentClient()
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -89,7 +88,7 @@ export default function RegisterPage() {
 
         console.log('Household created:', householdData)
 
-        // 3. Create user profile with correct fields matching your actual schema
+        // 3. Create user profile
         const { error: profileError } = await supabase
           .from('user_profiles')
           .insert({
@@ -109,27 +108,73 @@ export default function RegisterPage() {
 
         console.log('Profile created successfully')
 
-        // SUCCESS! Now show success message and redirect
+        // Sign out the user so they can login fresh
+        await supabase.auth.signOut()
+
+        // Show success message (no redirect)
         setSuccess(true)
-        setError('') // Clear any errors
-        
-        // Redirect after giving AuthProvider time to load the profile
-        setTimeout(() => {
-          console.log('Redirecting to dashboard...')
-          router.push('/dashboard')
-        }, 1500)
+        setError('')
 
       } else {
         // Email confirmation required
-        setError('Please check your email for a confirmation link')
+        setSuccess(true)
+        setError('Please check your email for a confirmation link before logging in.')
       }
 
     } catch (err) {
       console.error('Registration error:', err)
-      setError('An unexpected error occurred')
+      setError('An unexpected error occurred during registration')
     } finally {
       setLoading(false)
     }
+  }
+
+  // If registration was successful, show success screen
+  if (success) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full">
+          <div className="bg-white rounded-xl shadow-sm p-8 text-center">
+            <div className="text-green-600 mb-6">
+              <svg className="h-16 w-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">Account Created Successfully!</h1>
+            
+            <p className="text-gray-600 mb-6">
+              Your MyFamilyBasket account has been created and is ready to use. 
+              You can now log in to start managing your family budget.
+            </p>
+
+            <div className="bg-gray-50 rounded-lg p-4 mb-6">
+              <div className="text-sm text-gray-700">
+                <p><strong>Email:</strong> {formData.email}</p>
+                <p><strong>Name:</strong> {formData.fullName}</p>
+                <p><strong>Household:</strong> {formData.householdName}</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Link
+                href="/login"
+                className="block w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium"
+              >
+                Continue to Login
+              </Link>
+              
+              <Link
+                href="/"
+                className="block w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              >
+                Back to Home
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -158,18 +203,9 @@ export default function RegisterPage() {
         {/* Register Form */}
         <div className="bg-white rounded-xl shadow-sm p-8">
           <form className="space-y-6" onSubmit={handleRegister}>
-            {error && !success && (
+            {error && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
                 {error}
-              </div>
-            )}
-
-            {success && (
-              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
-                <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600 mr-2"></div>
-                  Account created successfully! Redirecting to dashboard...
-                </div>
               </div>
             )}
 
@@ -182,9 +218,10 @@ export default function RegisterPage() {
                 name="fullName"
                 type="text"
                 required
+                disabled={loading}
                 value={formData.fullName}
                 onChange={handleInputChange}
-                className="appearance-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                className="appearance-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm disabled:bg-gray-100"
                 placeholder="Enter your full name"
               />
             </div>
@@ -199,9 +236,10 @@ export default function RegisterPage() {
                 type="email"
                 autoComplete="email"
                 required
+                disabled={loading}
                 value={formData.email}
                 onChange={handleInputChange}
-                className="appearance-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                className="appearance-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm disabled:bg-gray-100"
                 placeholder="Enter your email"
               />
             </div>
@@ -215,9 +253,10 @@ export default function RegisterPage() {
                 name="householdName"
                 type="text"
                 required
+                disabled={loading}
                 value={formData.householdName}
                 onChange={handleInputChange}
-                className="appearance-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                className="appearance-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm disabled:bg-gray-100"
                 placeholder="e.g., The Smith Family"
               />
               <p className="mt-1 text-xs text-gray-500">
@@ -235,9 +274,10 @@ export default function RegisterPage() {
                 type="password"
                 autoComplete="new-password"
                 required
+                disabled={loading}
                 value={formData.password}
                 onChange={handleInputChange}
-                className="appearance-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                className="appearance-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm disabled:bg-gray-100"
                 placeholder="Create a password (min. 6 characters)"
               />
             </div>
@@ -252,9 +292,10 @@ export default function RegisterPage() {
                 type="password"
                 autoComplete="new-password"
                 required
+                disabled={loading}
                 value={formData.confirmPassword}
                 onChange={handleInputChange}
-                className="appearance-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                className="appearance-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm disabled:bg-gray-100"
                 placeholder="Confirm your password"
               />
             </div>
@@ -265,7 +306,8 @@ export default function RegisterPage() {
                 name="agree-terms"
                 type="checkbox"
                 required
-                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                disabled={loading}
+                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded disabled:bg-gray-100"
               />
               <label htmlFor="agree-terms" className="ml-2 block text-sm text-gray-900">
                 I agree to the{' '}
@@ -282,15 +324,10 @@ export default function RegisterPage() {
             <div>
               <button
                 type="submit"
-                disabled={loading || success}
+                disabled={loading}
                 className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {success ? (
-                  <div className="flex items-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Account Created! Redirecting...
-                  </div>
-                ) : loading ? (
+                {loading ? (
                   <div className="flex items-center">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                     Creating account...
