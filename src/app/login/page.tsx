@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase/client';
-
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -13,54 +12,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const router = useRouter();
 
-  /** Debug helper: create household + user_profiles row if missing */
-  const createMissingProfile = async () => {
-    try {
-      const { data: userRes } = await supabase.auth.getUser();
-      const user = userRes.user;
-      if (!user) {
-        alert('No authenticated user. Please sign in first.');
-        return;
-      }
-
-      // 1) Create a household (name only; extend as needed)
-      const householdName = `${(user.email ?? 'User').split('@')[0]}'s Household`;
-
-      const { data: household, error: householdError } = await supabase
-        .from('households')
-        .insert([{ name: householdName }])
-        .select('*')
-        .single();
-
-      if (householdError) {
-        console.error('Household error:', householdError);
-        alert(`Household error: ${householdError.message}`);
-        return;
-      }
-
-      // 2) Create user_profiles row (match your schema nullability)
-      const { error: profileError } = await supabase.from('user_profiles').insert([
-        {
-          id: user.id, // required
-          household_id: household.id, // from insert above
-          email: user.email ?? null,
-          full_name: (user.email ?? 'User').split('@')[0] ?? null,
-          role: 'admin', // or 'user'
-        },
-      ]);
-
-      if (profileError) {
-        console.error('Profile error:', profileError);
-        alert(`Profile error: ${profileError.message}`);
-        return;
-      }
-
-      alert('Profile created. Refresh the page and open the dashboard.');
-    } catch (err) {
-      console.error('createMissingProfile error:', err);
-      alert('Unexpected error creating profile. See console.');
-    }
-  };
+  const supabase = createClientComponentClient();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -227,17 +179,6 @@ export default function LoginPage() {
               </button>
             </div>
           </div>
-        </div>
-
-        {/* Debug util to quickly create household+profile for current user */}
-        <div className="mt-4 text-center">
-          <button
-            type="button"
-            onClick={createMissingProfile}
-            className="bg-red-600 text-white px-4 py-2 rounded"
-          >
-            Create Missing Profile (Debug)
-          </button>
         </div>
       </div>
     </div>

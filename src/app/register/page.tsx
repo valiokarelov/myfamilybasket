@@ -1,8 +1,9 @@
-//app/register/page.tsx - Simple success version
+//app/register/page.tsx 
 'use client'
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 export default function RegisterPage() {
@@ -16,7 +17,8 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
-    
+  const router = useRouter()
+  
   const supabase = createClientComponentClient()
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,10 +110,7 @@ export default function RegisterPage() {
 
         console.log('Profile created successfully')
 
-        // Sign out the user so they can login fresh
-        await supabase.auth.signOut()
-
-        // Show success message (no redirect)
+        // Show success message immediately (no signOut needed)
         setSuccess(true)
         setError('')
 
